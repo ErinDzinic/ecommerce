@@ -21,6 +21,8 @@ admin.initializeApp({
 });
 
 
+let db = admin.firestore();
+
 
 //routes
 
@@ -35,18 +37,72 @@ app.post('/signup',(req,res) =>{
         return res.json({'alert': 'your password needs to contain atleast 8 characters'});
     }else if(!number.length){
         return res.json({'alert': 'enter your phone number'});
-    }else if(!Number(number.value) || number.length<10){
+    }else if(!Number(number) || number.length<10){
         return res.json({'alert': 'invalid number, enter valid number'});
-    }else if(!tac.checked){
+    }else if(!tac){
         return res.json({'alert': 'you must agree to our terms and conditions'});
-    }else{
-
     }
 
-    res.json('data recieved');
+    //store user in db - check if user already exists
+    db.collection('users').doc(email).get()
+    .then(user => {
+        if(user.exists){
+            return res.json({'alert': 'user with this email already exists'});
+        }else{
+            bcrypt.genSalt(10,(err,salt) =>{
+                bcrypt.hash(password, salt,(err,hash) =>{
+                    req.body.password = hash;
+                    db.collection('users').doc(email).set(req.body)
+                    .then(data =>{
+                        res.json({
+                            name: req.body.name,
+                            email: req.body.email,
+                            seller: req.body.seller
+                        })
+                    })
+                })
+            })
+        }
+    })
 })
 
-app.get('/signup',(req,res)=>{
+app.get('/login',(req,res) =>{
+    res.sendFile(path.join(staticPath,'html/login.html'));
+})
+
+app.post('/login',(req,res) =>{
+    let { email, password } = req.body
+
+    if(!email.length || !password.length){
+        return res.json({'alert': 'Please fill all fields!'});
+    }
+ 
+    db.collection('users').doc(email).get()
+    .then(user =>{
+        if(!user.exists){
+            return res.json({'alert':'Your email does not exist'});
+        }else {
+            bcrypt.compare(password, user.data().password, (err,result) =>{
+                if(result){
+                    let data = user.data();
+                    return res.json({
+                        name: data.name,
+                        email: data.email,
+                        seller: data.seller,
+                    })
+                } else {
+                    return res.json({'alert':'Password is incorrect'});
+                }
+            })
+        }
+    })
+})
+
+app.get('/seller', (req,res) =>{
+    res.sendFile(path.join(staticPath, 'html/seller.html'));
+})
+
+app.get('/signup',(req,res)=>{ 
     res.sendFile(path.join(staticPath,'html/signup.html'))
 })
 
@@ -65,3 +121,6 @@ app.use((req,res)=>{
 app.listen(3000,()=> {
     console.log('listening on port 3000....');
 })
+
+
+
